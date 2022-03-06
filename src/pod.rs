@@ -1,7 +1,6 @@
 use super::alloc_api::*;
 use super::CopyRange;
-use super::{expect, unwrap};
-use alloc::alloc::Layout;
+use alloc::alloc::{Layout, LayoutError};
 use core::num::NonZeroUsize;
 use core::ops::*;
 use core::ptr::NonNull;
@@ -226,6 +225,61 @@ where
         self.raw.realloc(&self.allocator, len);
     }
 
+    fn u_ptr(&self, i: usize) -> NonNull<T> {
+        match self.ptr(i) {
+            Some(p) => return p,
+            None => {
+                panic!(
+                    "index out of bounds: len={} but index={}",
+                    self.raw.length, i
+                );
+            }
+        }
+    }
+
+    fn u_slice(&self, r: Range<usize>) -> (*mut T, usize) {
+        let (start, end) = (r.start, r.end);
+        if !self.raw.range_is_valid(start, end) {
+            panic!(
+                "slice index out of bounds: len={} but slice index={}..{}",
+                self.raw.length, r.start, r.end
+            );
+        }
+
+        let data = self.raw.ptr(start);
+        let len = end - start;
+
+        return (data as *mut T, len);
+    }
+
+    #[inline(always)]
+    fn uget(&self, i: usize) -> &T {
+        let ptr = self.u_ptr(i);
+
+        return unsafe { &*ptr.as_ptr() };
+    }
+
+    #[inline(always)]
+    fn uget_mut(&mut self, i: usize) -> &mut T {
+        let ptr = self.u_ptr(i);
+
+        return unsafe { &mut *ptr.as_ptr() };
+    }
+
+    #[inline(always)]
+    fn uget_slice(&self, r: Range<usize>) -> &[T] {
+        let (ptr, len) = self.u_slice(r);
+
+        return unsafe { core::slice::from_raw_parts(ptr, len) };
+    }
+
+    #[inline(always)]
+    fn uget_mut_slice(&mut self, r: Range<usize>) -> &mut [T] {
+        let (ptr, len) = self.u_slice(r);
+
+        return unsafe { core::slice::from_raw_parts_mut(ptr, len) };
+    }
+
     #[inline(always)]
     pub fn raw_ptr(&self, i: usize) -> Option<*mut T> {
         let data = self.raw.ptr(i);
@@ -233,6 +287,7 @@ where
         return Some(data as *mut T);
     }
 
+    #[inline(always)]
     fn ptr(&self, i: usize) -> Option<NonNull<T>> {
         if i >= self.raw.length {
             return None;
@@ -386,7 +441,7 @@ where
 
     #[inline(always)]
     fn deref(&self) -> &[T] {
-        return unwrap(self.get_slice(0..self.raw.length));
+        return self.uget_slice(0..self.raw.length);
     }
 }
 
@@ -397,7 +452,7 @@ where
 {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut [T] {
-        return unwrap(self.get_mut_slice(0..self.raw.length));
+        return self.uget_mut_slice(0..self.raw.length);
     }
 }
 
@@ -410,7 +465,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: u32) -> &T {
-        return unwrap(self.get(i as usize));
+        return self.uget(i as usize);
     }
 }
 
@@ -421,7 +476,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: u32) -> &mut T {
-        return unwrap(self.get_mut(i as usize));
+        return self.uget_mut(i as usize);
     }
 }
 
@@ -434,7 +489,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: usize) -> &T {
-        return unwrap(self.get(i));
+        return self.uget(i);
     }
 }
 
@@ -445,7 +500,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: usize) -> &mut T {
-        return unwrap(self.get_mut(i));
+        return self.uget_mut(i);
     }
 }
 
@@ -458,7 +513,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: CopyRange) -> &[T] {
-        return unwrap(self.get_slice(i.start..i.end));
+        return self.uget_slice(i.start..i.end);
     }
 }
 
@@ -469,7 +524,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: CopyRange) -> &mut [T] {
-        return unwrap(self.get_mut_slice(i.start..i.end));
+        return self.uget_mut_slice(i.start..i.end);
     }
 }
 
@@ -482,7 +537,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: RangeTo<usize>) -> &[T] {
-        return unwrap(self.get_slice(0..i.end));
+        return self.uget_slice(0..i.end);
     }
 }
 
@@ -493,7 +548,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: RangeTo<usize>) -> &mut [T] {
-        return unwrap(self.get_mut_slice(0..i.end));
+        return self.uget_mut_slice(0..i.end);
     }
 }
 
@@ -506,7 +561,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: RangeFrom<usize>) -> &[T] {
-        return unwrap(self.get_slice(i.start..self.raw.length));
+        return self.uget_slice(i.start..self.raw.length);
     }
 }
 
@@ -517,7 +572,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: RangeFrom<usize>) -> &mut [T] {
-        return unwrap(self.get_mut_slice(i.start..self.raw.length));
+        return self.uget_mut_slice(i.start..self.raw.length);
     }
 }
 
@@ -530,7 +585,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: RangeFull) -> &[T] {
-        return unwrap(self.get_slice(0..self.raw.length));
+        return self.uget_slice(0..self.raw.length);
     }
 }
 
@@ -541,7 +596,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: RangeFull) -> &mut [T] {
-        return unwrap(self.get_mut_slice(0..self.raw.length));
+        return self.uget_mut_slice(0..self.raw.length);
     }
 }
 
@@ -554,7 +609,7 @@ where
 
     #[inline(always)]
     fn index(&self, i: Range<usize>) -> &[T] {
-        return unwrap(self.get_slice(i));
+        return self.uget_slice(i);
     }
 }
 
@@ -565,7 +620,7 @@ where
 {
     #[inline(always)]
     fn index_mut(&mut self, i: Range<usize>) -> &mut [T] {
-        return unwrap(self.get_mut_slice(i));
+        return self.uget_mut_slice(i);
     }
 }
 
@@ -669,10 +724,19 @@ impl RawPod {
     }
 
     fn realloc(&mut self, alloc: &dyn Allocator, elem_capacity: usize) {
+        match self.try_realloc(alloc, elem_capacity) {
+            Ok(()) => {}
+            Err(e) => {
+                panic!("failed to get layout for reallocation");
+            }
+        }
+    }
+
+    fn try_realloc(&mut self, alloc: &dyn Allocator, elem_capacity: usize) -> Result<(), ()> {
         let (size, align) = (self.info.size, self.info.align);
         let get_info = move |mut data: NonNull<[u8]>| -> (NonNull<u8>, usize) {
             let data = unsafe { data.as_mut() };
-            let capacity = unwrap(data.len().checked_div(size));
+            let capacity = data.len() / size;
             let data = unsafe { NonNull::new_unchecked(data.as_mut_ptr()) };
 
             return (data, capacity);
@@ -680,29 +744,29 @@ impl RawPod {
 
         // We use the same trick that std::vec::Vec uses
         let (data, capacity) = match (size * self.capacity, size * elem_capacity) {
-            (x, y) if x == y => return,
+            (x, y) if x == y => return Ok(()),
             (0, 0) => {
                 self.capacity = elem_capacity;
-                return;
+                return Ok(());
             }
 
             (prev_size, 0) => {
-                let layout = expect(Layout::from_size_align(prev_size, align));
+                let layout = Layout::from_size_align(prev_size, align).map_err(|_| ())?;
                 unsafe { alloc.deallocate(self.data, layout) };
 
                 (NonNull::dangling(), elem_capacity)
             }
 
             (0, new_size) => {
-                let layout = expect(Layout::from_size_align(new_size, align));
-                let data = expect(alloc.allocate(layout));
+                let layout = Layout::from_size_align(new_size, align).map_err(|_| ())?;
+                let data = alloc.allocate(layout).map_err(|_| ())?;
 
                 get_info(data)
             }
 
             (prev_size, new_size) => {
-                let prev_layout = expect(Layout::from_size_align(prev_size, align));
-                let new_layout = expect(Layout::from_size_align(new_size, align));
+                let prev_layout = Layout::from_size_align(prev_size, align).map_err(|_| ())?;
+                let new_layout = Layout::from_size_align(new_size, align).map_err(|_| ())?;
 
                 let result = unsafe {
                     if new_size > prev_size {
@@ -712,7 +776,7 @@ impl RawPod {
                     }
                 };
 
-                let data = expect(result);
+                let data = result.map_err(|_| ())?;
 
                 get_info(data)
             }
@@ -721,6 +785,8 @@ impl RawPod {
         self.data = data;
         self.length = core::cmp::min(self.length, elem_capacity);
         self.capacity = elem_capacity;
+
+        return Ok(());
     }
 
     fn with_capacity(info: DataInfo, alloc: &dyn Allocator, capacity: usize) -> Self {
