@@ -727,12 +727,16 @@ impl RawPod {
         match self.try_realloc(alloc, elem_capacity) {
             Ok(()) => {}
             Err(e) => {
-                panic!("failed to get layout for reallocation");
+                panic!("{}", e);
             }
         }
     }
 
-    fn try_realloc(&mut self, alloc: &dyn Allocator, elem_capacity: usize) -> Result<(), ()> {
+    fn try_realloc(
+        &mut self,
+        alloc: &dyn Allocator,
+        elem_capacity: usize,
+    ) -> Result<(), &'static str> {
         let (size, align) = (self.info.size, self.info.align);
         let get_info = move |mut data: NonNull<[u8]>| -> (NonNull<u8>, usize) {
             let data = unsafe { data.as_mut() };
@@ -752,22 +756,26 @@ impl RawPod {
             }
 
             (prev_size, 0) => {
-                let layout = Layout::from_size_align(prev_size, align).map_err(|_| ())?;
+                let layout =
+                    Layout::from_size_align(prev_size, align).map_err(|_| "layout failure")?;
                 unsafe { alloc.deallocate(self.data, layout) };
 
                 (NonNull::dangling(), elem_capacity)
             }
 
             (0, new_size) => {
-                let layout = Layout::from_size_align(new_size, align).map_err(|_| ())?;
-                let data = alloc.allocate(layout).map_err(|_| ())?;
+                let layout =
+                    Layout::from_size_align(new_size, align).map_err(|_| "layout failure")?;
+                let data = alloc.allocate(layout).map_err(|_| "allocation failure")?;
 
                 get_info(data)
             }
 
             (prev_size, new_size) => {
-                let prev_layout = Layout::from_size_align(prev_size, align).map_err(|_| ())?;
-                let new_layout = Layout::from_size_align(new_size, align).map_err(|_| ())?;
+                let prev_layout =
+                    Layout::from_size_align(prev_size, align).map_err(|_| "layout failure")?;
+                let new_layout =
+                    Layout::from_size_align(new_size, align).map_err(|_| "layout failure")?;
 
                 let result = unsafe {
                     if new_size > prev_size {
@@ -777,15 +785,17 @@ impl RawPod {
                     }
                 };
 
-                let data = result.map_err(|_| ())?;
+                let data = result.map_err(|_| "allocation failure")?;
 
                 get_info(data)
             }
         };
 
+        debug_assert!(capacity >= elem_capacity);
+
         self.data = data;
-        self.length = core::cmp::min(self.length, elem_capacity);
-        self.capacity = elem_capacity;
+        self.length = core::cmp::min(self.length, capacity);
+        self.capacity = capacity;
 
         return Ok(());
     }

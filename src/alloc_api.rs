@@ -9,16 +9,17 @@ pub struct AllocError;
 pub unsafe trait Allocator {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError>;
 
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout);
+
     fn allocate_zeroed(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         let mut ptr = self.allocate(layout)?;
         unsafe {
             let s_ptr = ptr.as_mut();
             s_ptr.as_mut().as_mut_ptr().write_bytes(0, s_ptr.len());
         }
+
         Ok(ptr)
     }
-
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout);
 
     unsafe fn grow(
         &self,
