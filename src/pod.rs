@@ -215,6 +215,18 @@ where
     }
 
     #[inline(always)]
+    pub unsafe fn set_len(&mut self, new_len: usize) {
+        debug_assert!(
+            new_len < self.raw.capacity,
+            "set_len got value that was too large! capa={}, new_len={}",
+            self.raw.capacity,
+            new_len
+        );
+
+        self.raw.length = new_len;
+    }
+
+    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
         self.raw.reserve_additional(&self.allocator, additional);
     }
