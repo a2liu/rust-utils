@@ -2,6 +2,10 @@
 name = "aliu"
 version = "0.1.0"
 edition = "2021"
+description = "Albert Liu's utilities"
+homepage = "https://github.com/A1Liu/rust-utils"
+repository = "https://github.com/A1Liu/rust-utils"
+license = "MIT"
 
 [lib]
 name = "aliu"
