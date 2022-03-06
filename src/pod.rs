@@ -742,7 +742,8 @@ impl RawPod {
             return (data, capacity);
         };
 
-        // We use the same trick that std::vec::Vec uses
+        // We use the same trick that std::vec::Vec uses, where a capacity of
+        // zero means we don't look at the data pointer at all
         let (data, capacity) = match (size * self.capacity, size * elem_capacity) {
             (x, y) if x == y => return Ok(()),
             (0, 0) => {
