@@ -1,2 +1,2 @@
-# rust-utils
-Rust utilities
+# Rust Utilities
+My Rust utilities.
