@@ -227,6 +227,15 @@ where
     }
 
     #[inline(always)]
+    pub fn truncate(&mut self, new_len: usize) {
+        if new_len >= self.raw.length {
+            return;
+        }
+
+        self.raw.length = new_len;
+    }
+
+    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
         self.raw.reserve_additional(&self.allocator, additional);
     }
