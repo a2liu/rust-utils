@@ -394,6 +394,26 @@ where
     }
 }
 
+impl<T> FromIterator<T> for Pod<T>
+where
+    T: Copy,
+{
+    fn from_iter<I>(i: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
+        let iter = i.into_iter();
+
+        let mut pod = Self::with_capacity(iter.size_hint().0);
+
+        for item in iter {
+            pod.push(item);
+        }
+
+        return pod;
+    }
+}
+
 impl<T, A> Drop for Pod<T, A>
 where
     T: Copy,
