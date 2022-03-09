@@ -31,3 +31,11 @@ fn test_with_bucket_list() {
         128 + BucketList::DEFAULT_BUCKET_SIZE
     );
 }
+
+#[test]
+fn test_basics() {
+    let a = r(12, 12);
+    let b = r(12u32, 12);
+
+    println!("{:?} {:?}", a, b);
+}

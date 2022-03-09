@@ -25,23 +25,39 @@ pub fn unwrap<V>(opt: Option<V>) -> V {
 }
 
 #[derive(Clone, Copy)]
-pub struct CopyRange {
-    pub start: usize,
-    pub end: usize,
+pub struct CopyRange<U = usize>
+where
+    U: Copy,
+{
+    pub start: U,
+    pub end: U,
 }
 
-pub const fn r(start: usize, end: usize) -> CopyRange {
+pub fn r<U>(start: U, end: U) -> CopyRange<U>
+where
+    U: Copy,
+{
     return CopyRange { start, end };
 }
 
-impl CopyRange {
+impl CopyRange<usize> {
     #[inline(always)]
     pub fn len(&self) -> usize {
         return self.end - self.start;
     }
 }
 
-impl core::fmt::Debug for CopyRange {
+impl CopyRange<u32> {
+    #[inline(always)]
+    pub fn len(&self) -> u32 {
+        return self.end - self.start;
+    }
+}
+
+impl<U> core::fmt::Debug for CopyRange<U>
+where
+    U: core::fmt::Display + Copy,
+{
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         return write!(f, "{}..{}", self.start, self.end);
     }
