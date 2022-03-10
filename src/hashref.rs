@@ -79,7 +79,7 @@ where
         I: Iterator<Item = (K, V)>,
     {
         let mut slots_array = pod![HashRefSlot::None; capa; &frame];
-        let slots = &mut slots_array;
+        let slots = &mut *slots_array;
         let mut size = 0;
 
         for (key, value) in data {

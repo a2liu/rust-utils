@@ -34,8 +34,15 @@ fn test_with_bucket_list() {
 
 #[test]
 fn test_basics() {
-    let a = r(12, 12);
-    let b = r(12u32, 12);
+    let a = r(0usize, 5);
+    let b = r(0u32, 5u32);
+    let c = 0usize;
+    let d = 0u32;
 
-    println!("{:?} {:?}", a, b);
+    let data = pod![1, 2, 3, 4, 5, 6, 7];
+
+    assert_eq!(&[1, 2, 3, 4, 5], &data[a]);
+    assert_eq!(&[1, 2, 3, 4, 5], &data[b]);
+    assert_eq!(&1, &data[c]);
+    assert_eq!(&1, &data[d]);
 }

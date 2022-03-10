@@ -62,3 +62,165 @@ where
         return write!(f, "{}..{}", self.start, self.end);
     }
 }
+
+pub trait SliceIndex<T>: Clone + core::fmt::Debug {
+    type IndexResult: ?Sized;
+
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult>;
+
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult>;
+}
+
+impl<T> SliceIndex<T> for u8 {
+    type IndexResult = T;
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self as usize);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self as usize);
+    }
+}
+
+impl<T> SliceIndex<T> for u16 {
+    type IndexResult = T;
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self as usize);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self as usize);
+    }
+}
+
+impl<T> SliceIndex<T> for u32 {
+    type IndexResult = T;
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self as usize);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self as usize);
+    }
+}
+
+impl<T> SliceIndex<T> for usize {
+    type IndexResult = T;
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self);
+    }
+}
+
+impl<T> SliceIndex<T> for CopyRange<u32> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get((self.start as usize)..(self.end as usize));
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut((self.start as usize)..(self.end as usize));
+    }
+}
+
+impl<T> SliceIndex<T> for CopyRange<usize> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self.start..self.end);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self.start..self.end);
+    }
+}
+
+impl<T> SliceIndex<T> for core::ops::Range<u32> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get((self.start as usize)..(self.end as usize));
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut((self.start as usize)..(self.end as usize));
+    }
+}
+
+impl<T> SliceIndex<T> for core::ops::Range<usize> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self);
+    }
+}
+
+impl<T> SliceIndex<T> for core::ops::RangeTo<usize> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self);
+    }
+}
+
+impl<T> SliceIndex<T> for core::ops::RangeFrom<usize> {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self);
+    }
+}
+
+impl<T> SliceIndex<T> for core::ops::RangeFull {
+    type IndexResult = [T];
+
+    #[inline]
+    fn index(self, data: &[T]) -> Option<&Self::IndexResult> {
+        return data.get(self);
+    }
+
+    #[inline]
+    fn index_mut(self, data: &mut [T]) -> Option<&mut Self::IndexResult> {
+        return data.get_mut(self);
+    }
+}

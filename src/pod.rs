@@ -1,5 +1,5 @@
 use super::alloc_api::*;
-use super::CopyRange;
+use super::{CopyRange, SliceIndex};
 use alloc::alloc::{Layout, LayoutError};
 use core::num::NonZeroUsize;
 use core::ops::*;
@@ -246,61 +246,6 @@ where
         self.raw.realloc(&self.allocator, len);
     }
 
-    fn u_ptr(&self, i: usize) -> NonNull<T> {
-        match self.ptr(i) {
-            Some(p) => return p,
-            None => {
-                panic!(
-                    "index out of bounds: len={} but index={}",
-                    self.raw.length, i
-                );
-            }
-        }
-    }
-
-    fn u_slice(&self, r: Range<usize>) -> (*mut T, usize) {
-        let (start, end) = (r.start, r.end);
-        if !self.raw.range_is_valid(start, end) {
-            panic!(
-                "slice index out of bounds: len={} but slice index={}..{}",
-                self.raw.length, r.start, r.end
-            );
-        }
-
-        let data = self.raw.ptr(start);
-        let len = end - start;
-
-        return (data as *mut T, len);
-    }
-
-    #[inline(always)]
-    fn uget(&self, i: usize) -> &T {
-        let ptr = self.u_ptr(i);
-
-        return unsafe { &*ptr.as_ptr() };
-    }
-
-    #[inline(always)]
-    fn uget_mut(&mut self, i: usize) -> &mut T {
-        let ptr = self.u_ptr(i);
-
-        return unsafe { &mut *ptr.as_ptr() };
-    }
-
-    #[inline(always)]
-    fn uget_slice(&self, r: Range<usize>) -> &[T] {
-        let (ptr, len) = self.u_slice(r);
-
-        return unsafe { core::slice::from_raw_parts(ptr, len) };
-    }
-
-    #[inline(always)]
-    fn uget_mut_slice(&mut self, r: Range<usize>) -> &mut [T] {
-        let (ptr, len) = self.u_slice(r);
-
-        return unsafe { core::slice::from_raw_parts_mut(ptr, len) };
-    }
-
     #[inline(always)]
     pub fn raw_ptr(&self, i: usize) -> Option<*mut T> {
         let data = self.raw.ptr(i);
@@ -319,44 +264,20 @@ where
         return Some(unsafe { NonNull::new_unchecked(data as *mut T) });
     }
 
-    fn slice(&self, r: Range<usize>) -> Option<(*mut T, usize)> {
-        let (start, end) = (r.start, r.end);
-        if !self.raw.range_is_valid(start, end) {
-            return None;
-        }
-
-        let data = self.raw.ptr(start);
-        let len = end - start;
-
-        return Some((data as *mut T, len));
+    #[inline(always)]
+    pub fn get<I>(&self, i: I) -> Option<&I::IndexResult>
+    where
+        I: SliceIndex<T>,
+    {
+        return i.index(self);
     }
 
     #[inline(always)]
-    pub fn get(&self, i: usize) -> Option<&T> {
-        let ptr = self.ptr(i)?;
-
-        return Some(unsafe { &*ptr.as_ptr() });
-    }
-
-    #[inline(always)]
-    pub fn get_mut(&mut self, i: usize) -> Option<&mut T> {
-        let ptr = self.ptr(i)?;
-
-        return Some(unsafe { &mut *ptr.as_ptr() });
-    }
-
-    #[inline(always)]
-    pub fn get_slice(&self, r: Range<usize>) -> Option<&[T]> {
-        let (ptr, len) = self.slice(r)?;
-
-        return Some(unsafe { core::slice::from_raw_parts(ptr, len) });
-    }
-
-    #[inline(always)]
-    pub fn get_mut_slice(&mut self, r: Range<usize>) -> Option<&mut [T]> {
-        let (ptr, len) = self.slice(r)?;
-
-        return Some(unsafe { core::slice::from_raw_parts_mut(ptr, len) });
+    pub fn get_mut<I>(&mut self, i: I) -> Option<&mut I::IndexResult>
+    where
+        I: SliceIndex<T>,
+    {
+        return i.index_mut(self);
     }
 }
 
@@ -482,7 +403,8 @@ where
 
     #[inline(always)]
     fn deref(&self) -> &[T] {
-        return self.uget_slice(0..self.raw.length);
+        let ptr = self.raw.data.as_ptr() as *mut T;
+        return unsafe { core::slice::from_raw_parts(ptr, self.raw.length) };
     }
 }
 
@@ -493,175 +415,46 @@ where
 {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut [T] {
-        return self.uget_mut_slice(0..self.raw.length);
+        let ptr = self.raw.data.as_ptr() as *mut T;
+        return unsafe { core::slice::from_raw_parts_mut(ptr, self.raw.length) };
     }
 }
 
-impl<T, A> Index<u32> for Pod<T, A>
+impl<T, A, I> Index<I> for Pod<T, A>
 where
     T: Copy,
     A: Allocator,
+    I: SliceIndex<T>,
 {
-    type Output = T;
+    type Output = I::IndexResult;
 
     #[inline(always)]
-    fn index(&self, i: u32) -> &T {
-        return self.uget(i as usize);
+    fn index(&self, i: I) -> &I::IndexResult {
+        let len = self.raw.length;
+
+        if let Some(t) = i.clone().index(self) {
+            return t;
+        }
+
+        panic!("index out of bounds: len={} but index={:?}", len, i);
     }
 }
 
-impl<T, A> IndexMut<u32> for Pod<T, A>
+impl<T, A, I> IndexMut<I> for Pod<T, A>
 where
     T: Copy,
     A: Allocator,
+    I: SliceIndex<T>,
 {
     #[inline(always)]
-    fn index_mut(&mut self, i: u32) -> &mut T {
-        return self.uget_mut(i as usize);
-    }
-}
+    fn index_mut(&mut self, i: I) -> &mut I::IndexResult {
+        let len = self.raw.length;
 
-impl<T, A> Index<usize> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = T;
+        if let Some(t) = i.clone().index_mut(self) {
+            return t;
+        }
 
-    #[inline(always)]
-    fn index(&self, i: usize) -> &T {
-        return self.uget(i);
-    }
-}
-
-impl<T, A> IndexMut<usize> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: usize) -> &mut T {
-        return self.uget_mut(i);
-    }
-}
-
-impl<T, A> Index<CopyRange> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = [T];
-
-    #[inline(always)]
-    fn index(&self, i: CopyRange) -> &[T] {
-        return self.uget_slice(i.start..i.end);
-    }
-}
-
-impl<T, A> IndexMut<CopyRange> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: CopyRange) -> &mut [T] {
-        return self.uget_mut_slice(i.start..i.end);
-    }
-}
-
-impl<T, A> Index<RangeTo<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = [T];
-
-    #[inline(always)]
-    fn index(&self, i: RangeTo<usize>) -> &[T] {
-        return self.uget_slice(0..i.end);
-    }
-}
-
-impl<T, A> IndexMut<RangeTo<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: RangeTo<usize>) -> &mut [T] {
-        return self.uget_mut_slice(0..i.end);
-    }
-}
-
-impl<T, A> Index<RangeFrom<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = [T];
-
-    #[inline(always)]
-    fn index(&self, i: RangeFrom<usize>) -> &[T] {
-        return self.uget_slice(i.start..self.raw.length);
-    }
-}
-
-impl<T, A> IndexMut<RangeFrom<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: RangeFrom<usize>) -> &mut [T] {
-        return self.uget_mut_slice(i.start..self.raw.length);
-    }
-}
-
-impl<T, A> Index<RangeFull> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = [T];
-
-    #[inline(always)]
-    fn index(&self, i: RangeFull) -> &[T] {
-        return self.uget_slice(0..self.raw.length);
-    }
-}
-
-impl<T, A> IndexMut<RangeFull> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: RangeFull) -> &mut [T] {
-        return self.uget_mut_slice(0..self.raw.length);
-    }
-}
-
-impl<T, A> Index<Range<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    type Output = [T];
-
-    #[inline(always)]
-    fn index(&self, i: Range<usize>) -> &[T] {
-        return self.uget_slice(i);
-    }
-}
-
-impl<T, A> IndexMut<Range<usize>> for Pod<T, A>
-where
-    T: Copy,
-    A: Allocator,
-{
-    #[inline(always)]
-    fn index_mut(&mut self, i: Range<usize>) -> &mut [T] {
-        return self.uget_mut_slice(i);
+        panic!("index out of bounds: len={} but index={:?}", len, i);
     }
 }
 
