@@ -1,6 +1,6 @@
 [package]
 name = "aliu"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 description = "Albert Liu's utilities"
 homepage = "https://github.com/A1Liu/rust-utils"
