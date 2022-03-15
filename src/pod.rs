@@ -52,9 +52,11 @@ macro_rules! pod {
     }};
 }
 
-struct DataInfo {
+#[derive(Clone, Copy)]
+struct DataInfo<'a> {
     size: usize,
     align: usize,
+    alloc: &'a dyn Allocator,
 }
 
 // 2 purposes: Prevent monomorphization as much as possible, and allow for using
@@ -94,7 +96,7 @@ where
 
     pub fn with_capacity(capacity: usize) -> Self {
         let mut s = Self::new();
-        s.raw.realloc(&Global, capacity);
+        s.raw.realloc(Self::info(&Global), capacity);
 
         return s;
     }
@@ -106,24 +108,34 @@ where
     A: Allocator,
 {
     pub fn with_allocator(allocator: A) -> Self {
-        let info = DataInfo {
-            size: core::mem::size_of::<T>(),
-            align: core::mem::align_of::<T>(),
-        };
-
         return Self {
-            raw: RawPod::new(info),
+            raw: RawPod::new(),
             allocator,
             phantom: core::marker::PhantomData,
+        };
+    }
+
+    #[inline]
+    fn size() -> usize {
+        return core::mem::size_of::<T>();
+    }
+
+    #[inline]
+    fn info(alloc: &dyn Allocator) -> DataInfo {
+        return DataInfo {
+            size: core::mem::size_of::<T>(),
+            align: core::mem::align_of::<T>(),
+            alloc,
         };
     }
 
     #[inline(always)]
     pub fn extend_from_slice(&mut self, data: &[T]) {
         let len = data.len();
-        self.raw.reserve_additional(&self.allocator, len);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.reserve_additional(info, len);
 
-        let ptr = self.raw.ptr(self.raw.length) as *mut T;
+        let ptr = self.raw.ptr(info.size, self.raw.length) as *mut T;
         let to_space = unsafe { core::slice::from_raw_parts_mut(ptr, len) };
         to_space.copy_from_slice(data);
 
@@ -131,9 +143,10 @@ where
     }
 
     pub fn push(&mut self, t: T) {
-        self.raw.reserve_additional(&self.allocator, 1);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.reserve_additional(info, 1);
 
-        let ptr = self.raw.ptr(self.raw.length) as *mut T;
+        let ptr = self.raw.ptr(info.size, self.raw.length) as *mut T;
         self.raw.length += 1;
 
         unsafe { *ptr = t };
@@ -141,7 +154,7 @@ where
 
     pub fn leak<'b>(self) -> &'b mut [T] {
         let len = self.raw.length;
-        let ptr = self.raw.ptr(0) as *mut T;
+        let ptr = self.raw.ptr(Self::size(), 0) as *mut T;
 
         core::mem::forget(self);
 
@@ -153,14 +166,15 @@ where
     }
 
     pub fn insert(&mut self, i: usize, value: T) {
-        self.raw.reserve_additional(&self.allocator, 1);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.reserve_additional(info, 1);
         self.raw.length += 1;
 
-        if self.raw.copy_range(i..self.raw.length, i + 1) {
+        if self.raw.copy_range(info.size, i..self.raw.length, i + 1) {
             panic!("invalid position");
         }
 
-        let ptr = self.raw.ptr(i) as *mut T;
+        let ptr = self.raw.ptr(info.size, i) as *mut T;
         unsafe { *ptr = value };
     }
 
@@ -168,7 +182,8 @@ where
         let range = self.raw.translate_range(range);
         let len = values.len();
 
-        let ptr = self.raw.splice_ptr(&self.allocator, range, len) as *mut T;
+        let info = Self::info(self.allocator.by_ref());
+        let ptr = self.raw.splice_ptr(info, range, len) as *mut T;
         let slice = unsafe { core::slice::from_raw_parts_mut(ptr, len) };
 
         slice.copy_from_slice(values);
@@ -179,7 +194,7 @@ where
             return None;
         }
 
-        let ptr = self.raw.ptr(self.raw.length - 1) as *const T;
+        let ptr = self.raw.ptr(Self::size(), self.raw.length - 1) as *const T;
         self.raw.length -= 1;
 
         return Some(unsafe { *ptr });
@@ -188,16 +203,18 @@ where
     pub fn remove(&mut self, i: usize) -> T {
         let value = self[i];
 
-        self.raw.copy_range((i + 1)..self.raw.length, i);
+        let size = Self::size();
+        self.raw.copy_range(size, (i + 1)..self.raw.length, i);
         self.raw.length -= 1;
 
         return value;
     }
 
     pub fn push_repeat(&mut self, t: T, repeat: usize) {
-        self.raw.reserve_additional(&self.allocator, repeat);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.reserve_additional(info, repeat);
 
-        let ptr = self.raw.ptr(self.raw.length) as *mut T;
+        let ptr = self.raw.ptr(info.size, self.raw.length) as *mut T;
         let data = unsafe { core::slice::from_raw_parts_mut(ptr, repeat) };
         data.fill(t);
 
@@ -237,18 +254,20 @@ where
 
     #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
-        self.raw.reserve_additional(&self.allocator, additional);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.reserve_additional(info, additional);
     }
 
     #[inline(always)]
     pub fn shrink_to_fit(&mut self) {
         let len = self.raw.length;
-        self.raw.realloc(&self.allocator, len);
+        let info = Self::info(self.allocator.by_ref());
+        self.raw.realloc(info, len);
     }
 
     #[inline(always)]
     pub fn raw_ptr(&self, i: usize) -> Option<*mut T> {
-        let data = self.raw.ptr(i);
+        let data = self.raw.ptr(Self::size(), i);
 
         return Some(data as *mut T);
     }
@@ -259,7 +278,7 @@ where
             return None;
         }
 
-        let data = self.raw.ptr(i);
+        let data = self.raw.ptr(Self::size(), i);
 
         return Some(unsafe { NonNull::new_unchecked(data as *mut T) });
     }
@@ -351,7 +370,7 @@ where
 {
     #[inline(always)]
     fn drop(&mut self) {
-        self.raw.realloc(&self.allocator, 0)
+        self.raw.realloc(Self::info(&self.allocator), 0)
     }
 }
 
@@ -466,17 +485,15 @@ where
 
 struct RawPod {
     data: NonNull<u8>,
-    info: DataInfo,
     length: usize,
     capacity: usize,
 }
 
 impl RawPod {
-    fn new(info: DataInfo) -> Self {
+    fn new() -> Self {
         // We use the same trick that std::vec::Vec uses
         return Self {
             data: NonNull::dangling(),
-            info,
             length: 0,
             capacity: 0,
         };
@@ -504,42 +521,42 @@ impl RawPod {
     }
 
     #[inline(always)]
-    fn ptr(&self, i: usize) -> *mut u8 {
-        return unsafe { self.data.as_ptr().add(self.info.size * i) };
+    fn ptr(&self, size: usize, i: usize) -> *mut u8 {
+        return unsafe { self.data.as_ptr().add(size * i) };
     }
 
-    fn copy_range(&mut self, range: Range<usize>, to: usize) -> bool {
+    fn copy_range(&mut self, size: usize, range: Range<usize>, to: usize) -> bool {
         let (start, end) = (range.start, range.end);
 
         if !self.range_is_valid(start, end) {
             return true;
         }
 
-        let src = self.ptr(start);
-        let dest = self.ptr(to);
+        let src = self.ptr(size, start);
+        let dest = self.ptr(size, to);
         let copy_len = end - start;
 
         // Shift everything down to fill in that spot.
-        unsafe { core::ptr::copy(src, dest, self.info.size * copy_len) };
+        unsafe { core::ptr::copy(src, dest, size * copy_len) };
 
         return false;
     }
 
     #[inline(always)]
-    fn reserve_additional(&mut self, alloc: &dyn Allocator, additional: usize) {
-        return self.reserve_total(alloc, self.length + additional);
+    fn reserve_additional(&mut self, info: DataInfo, additional: usize) {
+        return self.reserve_total(info, self.length + additional);
     }
 
-    fn reserve_total(&mut self, alloc: &dyn Allocator, needed: usize) {
+    fn reserve_total(&mut self, info: DataInfo, needed: usize) {
         if needed <= self.capacity {
             return;
         }
 
         let new_capacity = core::cmp::max(needed, self.capacity * 3 / 2);
-        self.realloc(alloc, new_capacity);
+        self.realloc(info, new_capacity);
     }
 
-    fn splice_ptr(&mut self, alloc: &dyn Allocator, range: Range<usize>, len: usize) -> *mut u8 {
+    fn splice_ptr(&mut self, info: DataInfo, range: Range<usize>, len: usize) -> *mut u8 {
         let (start, end) = (range.start, range.end);
 
         if !self.range_is_valid(start, end) {
@@ -549,16 +566,16 @@ impl RawPod {
         let copy_target = start + len;
         let range_to_copy = end..self.length;
         let final_len = copy_target + range_to_copy.len();
-        self.reserve_total(alloc, final_len);
+        self.reserve_total(info, final_len);
 
-        self.copy_range(range_to_copy, copy_target);
+        self.copy_range(info.size, range_to_copy, copy_target);
         self.length = final_len;
 
-        return self.ptr(start);
+        return self.ptr(info.size, start);
     }
 
-    fn realloc(&mut self, alloc: &dyn Allocator, elem_capacity: usize) {
-        match self.try_realloc(alloc, elem_capacity) {
+    fn realloc(&mut self, info: DataInfo, elem_capacity: usize) {
+        match self.try_realloc(info, elem_capacity) {
             Ok(()) => {}
             Err(e) => {
                 panic!("{}", e);
@@ -566,12 +583,8 @@ impl RawPod {
         }
     }
 
-    fn try_realloc(
-        &mut self,
-        alloc: &dyn Allocator,
-        elem_capacity: usize,
-    ) -> Result<(), &'static str> {
-        let (size, align) = (self.info.size, self.info.align);
+    fn try_realloc(&mut self, info: DataInfo, elem_capacity: usize) -> Result<(), &'static str> {
+        let (size, align) = (info.size, info.align);
         let get_info = move |mut data: NonNull<[u8]>| -> (NonNull<u8>, usize) {
             let data = unsafe { data.as_mut() };
             let capacity = data.len() / size;
@@ -592,7 +605,7 @@ impl RawPod {
             (prev_size, 0) => {
                 let layout =
                     Layout::from_size_align(prev_size, align).map_err(|_| "layout failure")?;
-                unsafe { alloc.deallocate(self.data, layout) };
+                unsafe { info.alloc.deallocate(self.data, layout) };
 
                 (NonNull::dangling(), elem_capacity)
             }
@@ -600,7 +613,10 @@ impl RawPod {
             (0, new_size) => {
                 let layout =
                     Layout::from_size_align(new_size, align).map_err(|_| "layout failure")?;
-                let data = alloc.allocate(layout).map_err(|_| "allocation failure")?;
+                let data = info
+                    .alloc
+                    .allocate(layout)
+                    .map_err(|_| "allocation failure")?;
 
                 get_info(data)
             }
@@ -613,9 +629,9 @@ impl RawPod {
 
                 let result = unsafe {
                     if new_size > prev_size {
-                        alloc.grow(self.data, prev_layout, new_layout)
+                        info.alloc.grow(self.data, prev_layout, new_layout)
                     } else {
-                        alloc.shrink(self.data, prev_layout, new_layout)
+                        info.alloc.shrink(self.data, prev_layout, new_layout)
                     }
                 };
 
@@ -634,10 +650,10 @@ impl RawPod {
         return Ok(());
     }
 
-    fn with_capacity(info: DataInfo, alloc: &dyn Allocator, capacity: usize) -> Self {
+    fn with_capacity(info: DataInfo, capacity: usize) -> Self {
         // We use the same trick that std::vec::Vec uses
-        let mut s = Self::new(info);
-        s.realloc(alloc, capacity);
+        let mut s = Self::new();
+        s.realloc(info, capacity);
 
         return s;
     }
