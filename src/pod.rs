@@ -52,6 +52,7 @@ macro_rules! pod {
     }};
 }
 
+#[derive(Clone, Copy)]
 struct DataInfo {
     size: usize,
     align: usize,
@@ -151,6 +152,7 @@ where
         return unsafe { core::slice::from_raw_parts_mut(ptr, len) };
     }
 
+    #[inline(always)]
     pub fn clear(&mut self) {
         self.raw.length = 0;
     }
@@ -217,7 +219,7 @@ where
         return self.raw.length;
     }
 
-    #[inline(always)]
+    #[cfg_attr(not(debug_assertions), inline(always))]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(
             new_len < self.raw.capacity,
