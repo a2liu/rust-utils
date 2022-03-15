@@ -15,12 +15,6 @@ extern crate alloc;
 #[cfg(not(debug_assertions))]
 macro_rules! panic {
     ( $( $arg:tt )+ ) => {{
-        println!( $( $arg )+ );
-
-        panic!()
-    }};
-
-    () => {{
         #[cfg(target_arch = "wasm32")]
         core::arch::wasm32::unreachable();
 
