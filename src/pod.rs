@@ -431,7 +431,6 @@ where
 {
     type Output = I::IndexResult;
 
-    #[inline(always)]
     fn index(&self, i: I) -> &I::IndexResult {
         let len = self.raw.length;
 
@@ -449,7 +448,6 @@ where
     A: Allocator,
     I: SliceIndex<T>,
 {
-    #[inline(always)]
     fn index_mut(&mut self, i: I) -> &mut I::IndexResult {
         let len = self.raw.length;
 
