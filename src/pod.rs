@@ -107,6 +107,9 @@ where
     T: Copy,
     A: Allocator,
 {
+    const SIZE: usize = core::mem::size_of::<T>();
+    const ALIGN: usize = core::mem::align_of::<T>();
+
     pub fn with_allocator(allocator: A) -> Self {
         return Self {
             raw: RawPod::new(),
@@ -115,16 +118,11 @@ where
         };
     }
 
-    #[inline]
-    fn size() -> usize {
-        return core::mem::size_of::<T>();
-    }
-
-    #[inline]
+    #[inline(always)]
     fn info(alloc: &dyn Allocator) -> DataInfo {
         return DataInfo {
-            size: core::mem::size_of::<T>(),
-            align: core::mem::align_of::<T>(),
+            size: Self::SIZE,
+            align: Self::ALIGN,
             alloc,
         };
     }
@@ -154,7 +152,7 @@ where
 
     pub fn leak<'b>(self) -> &'b mut [T] {
         let len = self.raw.length;
-        let ptr = self.raw.ptr(Self::size(), 0) as *mut T;
+        let ptr = self.raw.ptr(Self::SIZE, 0) as *mut T;
 
         core::mem::forget(self);
 
@@ -194,7 +192,7 @@ where
             return None;
         }
 
-        let ptr = self.raw.ptr(Self::size(), self.raw.length - 1) as *const T;
+        let ptr = self.raw.ptr(Self::SIZE, self.raw.length - 1) as *const T;
         self.raw.length -= 1;
 
         return Some(unsafe { *ptr });
@@ -203,7 +201,7 @@ where
     pub fn remove(&mut self, i: usize) -> T {
         let value = self[i];
 
-        let size = Self::size();
+        let size = Self::SIZE;
         self.raw.copy_range(size, (i + 1)..self.raw.length, i);
         self.raw.length -= 1;
 
@@ -267,7 +265,7 @@ where
 
     #[inline(always)]
     pub fn raw_ptr(&self, i: usize) -> Option<*mut T> {
-        let data = self.raw.ptr(Self::size(), i);
+        let data = self.raw.ptr(Self::SIZE, i);
 
         return Some(data as *mut T);
     }
@@ -278,7 +276,7 @@ where
             return None;
         }
 
-        let data = self.raw.ptr(Self::size(), i);
+        let data = self.raw.ptr(Self::SIZE, i);
 
         return Some(unsafe { NonNull::new_unchecked(data as *mut T) });
     }
