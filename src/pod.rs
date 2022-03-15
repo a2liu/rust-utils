@@ -1,5 +1,5 @@
 use super::alloc_api::*;
-use super::{CopyRange, SliceIndex};
+use super::{const_max, CopyRange, SliceIndex};
 use alloc::alloc::{Layout, LayoutError};
 use core::num::NonZeroUsize;
 use core::ops::*;
@@ -60,6 +60,8 @@ struct DataInfo {
 
 // 2 purposes: Prevent monomorphization as much as possible, and allow for using
 // the allocator API on stable.
+//
+// always allocates to at least 8 alignment
 pub struct Pod<T, A = Global>
 where
     T: Copy,
@@ -107,7 +109,7 @@ where
     A: Allocator,
 {
     const SIZE: usize = core::mem::size_of::<T>();
-    const ALIGN: usize = core::mem::align_of::<T>();
+    const ALIGN: usize = const_max(core::mem::align_of::<T>(), 8);
 
     pub fn with_allocator(allocator: A) -> Self {
         let info = DataInfo {

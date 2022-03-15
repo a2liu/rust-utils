@@ -225,3 +225,11 @@ impl<T> SliceIndex<T> for core::ops::RangeFull {
         return data.get_mut(self);
     }
 }
+
+pub const fn const_cond(cond: bool, if_true: usize, if_false: usize) -> usize {
+    (cond as usize) * if_true + (!cond as usize) * if_false
+}
+
+pub const fn const_max(a: usize, b: usize) -> usize {
+    const_cond(a > b, a, b)
+}
