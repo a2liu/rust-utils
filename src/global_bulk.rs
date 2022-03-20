@@ -2,7 +2,7 @@ use crate::alloc_api::*;
 
 type Ptr = *const ();
 
-use os::*;
+pub use os::*;
 
 #[cfg(target_family = "unix")]
 mod os {
