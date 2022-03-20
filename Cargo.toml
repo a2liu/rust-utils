@@ -1,6 +1,6 @@
 [package]
 name = "aliu"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 description = "Albert Liu's utilities"
 homepage = "https://github.com/A1Liu/rust-utils"
@@ -12,3 +12,9 @@ name = "aliu"
 path = "src/lib.rs"
 
 [dependencies]
+
+[target."cfg(unix)".dependencies]
+libc = "=0.2.107"
+
+[target."cfg(windows)".dependencies]
+winapi = { version = "0.3", features = ["basetsd", "minwindef", "sysinfoapi", "memoryapi", "winnt"] }

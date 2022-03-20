@@ -38,6 +38,7 @@ macro_rules! unreachable {
 mod basic;
 
 mod alloc_api;
+mod global_bulk;
 
 #[macro_use]
 mod pod;
