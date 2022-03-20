@@ -49,5 +49,6 @@ mod hashref;
 pub use alloc_api::*;
 pub use basic::*;
 pub use bump::*;
+pub use global_bulk::*;
 pub use hashref::*;
 pub use pod::*;
