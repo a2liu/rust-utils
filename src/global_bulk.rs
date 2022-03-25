@@ -1,4 +1,6 @@
 use crate::alloc_api::*;
+use crate::basic::*;
+use std::ffi::*;
 
 type Ptr = *const ();
 
@@ -7,6 +9,20 @@ pub use os::*;
 #[cfg(target_family = "unix")]
 mod os {
     use super::*;
+
+    pub fn read_file_static(path: &str) -> &'static str {
+        let filepath = expect(CString::new(path));
+
+        // TODO how do I check this?
+        let fd = unsafe { libc::open(filepath.as_ptr(), libc::O_RDONLY) };
+
+        let flags = libc::MAP_SHARED;
+        let protection = libc::PROT_READ;
+
+        return "";
+    }
+
+    pub unsafe fn delete_file_static(file: &'static str) {}
 
     pub unsafe fn map_region(base: Ptr, size: usize) -> Result<Ptr, AllocError> {
         let mut flags = libc::MAP_PRIVATE | libc::MAP_ANON;
