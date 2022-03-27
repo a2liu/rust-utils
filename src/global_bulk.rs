@@ -14,7 +14,9 @@ mod os {
         let filepath = expect(CString::new(path));
 
         // TODO how do I check this?
-        let fd = unsafe { libc::open(filepath.as_ptr(), libc::O_RDONLY) };
+        let flags = libc::O_RDONLY | libc::O_LARGEFILE;
+        let fd = unsafe { libc::open(filepath.as_ptr(), flags) };
+        if fd == -1 {}
 
         let flags = libc::MAP_SHARED;
         let protection = libc::PROT_READ;
@@ -82,6 +84,33 @@ mod os {
         if result == FALSE {
             return Err(AllocError);
         }
+
+        return Ok(());
+    }
+}
+
+#[cfg(all(target_family = "wasm", not(target_os = "emscripten")))]
+mod os {
+    use super::*;
+    use core::alloc::Layout;
+    use core::ptr::NonNull;
+
+    pub unsafe fn map_region(base: Ptr, size: usize) -> Result<Ptr, AllocError> {
+        if !base.is_null() {
+            panic!("aliu::map_region caused an error: can't give value for base pointer on webassembly");
+        }
+
+        let layout = Layout::from_size_align(size, 8).map_err(|e| AllocError)?;
+        let alloc = Global.allocate(layout)?;
+
+        let ptr = &*alloc.as_ptr();
+        return Ok(ptr.as_ptr() as *const ());
+    }
+
+    pub unsafe fn unmap_region(base: Ptr, size: usize) -> Result<(), AllocError> {
+        let layout = Layout::from_size_align(size, 8).map_err(|e| AllocError)?;
+        let ptr = NonNull::new(base as *mut _).ok_or(AllocError)?;
+        Global.deallocate(ptr, layout);
 
         return Ok(());
     }
