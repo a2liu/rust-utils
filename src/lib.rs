@@ -44,6 +44,7 @@ mod global_bulk;
 mod pod;
 
 mod bump;
+mod fswatch;
 mod hashref;
 
 pub use alloc_api::*;
