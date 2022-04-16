@@ -11,15 +11,15 @@ mod os {
     use super::*;
 
     pub fn read_file_static(path: &str) -> &'static str {
-        let filepath = expect(CString::new(path));
+        // let filepath = expect(CString::new(path));
 
         // TODO how do I check this?
-        let flags = libc::O_RDONLY | libc::O_LARGEFILE;
-        let fd = unsafe { libc::open(filepath.as_ptr(), flags) };
-        if fd == -1 {}
+        // let flags = libc::O_RDONLY; // | libc::O_LARGEFILE;
+        // let fd = unsafe { libc::open(filepath.as_ptr(), flags) };
+        // if fd == -1 {}
 
-        let flags = libc::MAP_SHARED;
-        let protection = libc::PROT_READ;
+        // let flags = libc::MAP_SHARED;
+        // let protection = libc::PROT_READ;
 
         return "";
     }
