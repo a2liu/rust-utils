@@ -221,10 +221,24 @@ where
         return self.raw.length;
     }
 
+    pub fn resize(&mut self, size: usize, fill: T) {
+        if size > self.raw.capacity {
+            self.raw.realloc(&self.allocator, size);
+        }
+
+        if size > self.raw.length {
+            let ptr = self.raw.ptr(self.raw.length) as *mut T;
+            let data = unsafe { core::slice::from_raw_parts_mut(ptr, size - self.raw.length) };
+            data.fill(fill);
+        }
+
+        self.raw.length = size;
+    }
+
     #[cfg_attr(not(debug_assertions), inline(always))]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(
-            new_len < self.raw.capacity,
+            new_len <= self.raw.capacity,
             "set_len got value that was too large! capa={}, new_len={}",
             self.raw.capacity,
             new_len
