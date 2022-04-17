@@ -125,7 +125,6 @@ where
         };
     }
 
-    #[inline(always)]
     pub fn extend_from_slice(&mut self, data: &[T]) {
         let len = data.len();
         self.raw.reserve_additional(&self.allocator, len);
@@ -248,7 +247,6 @@ where
         self.raw.length = new_len;
     }
 
-    #[inline(always)]
     pub fn truncate(&mut self, new_len: usize) {
         if new_len >= self.raw.length {
             return;
@@ -270,25 +268,21 @@ where
         return (&*from, to);
     }
 
-    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
         self.raw.reserve_additional(&self.allocator, additional);
     }
 
-    #[inline(always)]
     pub fn shrink_to_fit(&mut self) {
         let len = self.raw.length;
         self.raw.realloc(&self.allocator, len);
     }
 
-    #[inline(always)]
     pub fn raw_ptr(&self, i: usize) -> Option<*mut T> {
         let data = self.raw.ptr(i);
 
         return Some(data as *mut T);
     }
 
-    #[inline(always)]
     fn ptr(&self, i: usize) -> Option<NonNull<T>> {
         if i >= self.raw.length {
             return None;
@@ -299,7 +293,6 @@ where
         return Some(unsafe { NonNull::new_unchecked(data as *mut T) });
     }
 
-    #[inline(always)]
     pub fn get<I>(&self, i: I) -> Option<&I::IndexResult>
     where
         I: SliceIndex<T>,
@@ -307,7 +300,6 @@ where
         return i.index(self);
     }
 
-    #[inline(always)]
     pub fn get_mut<I>(&mut self, i: I) -> Option<&mut I::IndexResult>
     where
         I: SliceIndex<T>,
