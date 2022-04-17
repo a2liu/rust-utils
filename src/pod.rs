@@ -376,7 +376,6 @@ where
     T: Copy,
     A: Allocator,
 {
-    #[inline(always)]
     fn drop(&mut self) {
         self.raw.realloc(&self.allocator, 0)
     }
@@ -415,7 +414,6 @@ where
     E: Copy,
     B: Allocator,
 {
-    #[inline(always)]
     fn eq(&self, other: &Pod<E, B>) -> bool {
         return self.deref() == other.deref();
     }
@@ -428,7 +426,6 @@ where
 {
     type Target = [T];
 
-    #[inline(always)]
     fn deref(&self) -> &[T] {
         let ptr = self.raw.data.as_ptr() as *mut T;
         return unsafe { core::slice::from_raw_parts(ptr, self.raw.length) };
@@ -440,7 +437,6 @@ where
     T: Copy,
     A: Allocator,
 {
-    #[inline(always)]
     fn deref_mut(&mut self) -> &mut [T] {
         let ptr = self.raw.data.as_ptr() as *mut T;
         return unsafe { core::slice::from_raw_parts_mut(ptr, self.raw.length) };
@@ -507,7 +503,6 @@ impl RawPod {
         };
     }
 
-    #[inline(always)]
     fn range_is_valid(&self, start: usize, end: usize) -> bool {
         return start <= end && end <= self.length;
     }
@@ -550,7 +545,6 @@ impl RawPod {
         return false;
     }
 
-    #[inline(always)]
     fn reserve_additional(&mut self, alloc: &dyn Allocator, additional: usize) {
         return self.reserve_total(alloc, self.length + additional);
     }
