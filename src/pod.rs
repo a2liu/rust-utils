@@ -55,7 +55,6 @@ macro_rules! pod {
 #[derive(Clone, Copy)]
 struct DataInfo {
     size: usize,
-    align: usize,
 }
 
 // 2 purposes: Prevent monomorphization as much as possible, and allow for using
@@ -112,10 +111,12 @@ where
     const ALIGN: usize = const_max(core::mem::align_of::<T>(), 8);
 
     pub fn with_allocator(allocator: A) -> Self {
-        let info = DataInfo {
-            size: Self::SIZE,
-            align: Self::ALIGN,
-        };
+        assert!(
+            Self::ALIGN <= 8,
+            "Pod only supports an alignment of up to 8"
+        );
+
+        let info = DataInfo { size: Self::SIZE };
 
         return Self {
             raw: RawPod::new(info),
@@ -254,6 +255,19 @@ where
         }
 
         self.raw.length = new_len;
+    }
+
+    pub fn extend_uninit(&mut self, extend: usize) -> (&[T], &mut [T]) {
+        self.raw.reserve_additional(&self.allocator, extend);
+
+        let old_len = self.raw.length;
+        self.raw.length += extend;
+
+        let ptr = self.raw.ptr(0) as *mut T;
+        let data = unsafe { core::slice::from_raw_parts_mut(ptr, self.raw.length) };
+        let (from, to) = data.split_at_mut(old_len);
+
+        return (&*from, to);
     }
 
     #[inline(always)]
@@ -590,7 +604,7 @@ impl RawPod {
         alloc: &dyn Allocator,
         elem_capacity: usize,
     ) -> Result<(), &'static str> {
-        let (size, align) = (self.info.size, self.info.align);
+        let (size, align) = (self.info.size, 8);
         let get_info = move |mut data: NonNull<[u8]>| -> (NonNull<u8>, usize) {
             let data = unsafe { data.as_mut() };
             let capacity = data.len() / size;

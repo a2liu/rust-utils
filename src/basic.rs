@@ -1,3 +1,17 @@
+#[macro_export]
+macro_rules! const_assert {
+    ($cond:expr) => {
+        // Causes overflow if condition is false
+        let _ = [(); 0 - (!($cond) as usize)];
+    };
+    ($($xs:expr),+) => {
+        const_assert!($($xs)&&+);
+    };
+    ($($xs:expr);+ $(;)*) => {
+        const_assert!($($xs),+);
+    };
+}
+
 #[cfg(debug_assertions)]
 pub fn expect<V, E>(res: Result<V, E>) -> V
 where
